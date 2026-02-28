@@ -35,7 +35,7 @@ def create_app():
     # API to fetch stored events (latest fetched first)
     @app.route("/events")
     def events():
-        cursor = mongo.db.events.find({}, {"_id": 0}).sort("timestamp", -1)
+        cursor = mongo.db.events.find({}, {"_id": 0}).sort("_id", -1)
         return jsonify(list(cursor)), 200
 
     return app
