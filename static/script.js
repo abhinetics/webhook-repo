@@ -4,26 +4,37 @@
     const POLL_INTERVAL = 15000; // 15 seconds
     const eventsContainer = document.getElementById("events");
 
-    /**
-     * Build a human-readable description string for an event.
-     */
-    function formatEvent(evt) {
-        const author = `<span class="author">${esc(evt.author)}</span>`;
-        const from   = `<span class="branch">${esc(evt.from_branch)}</span>`;
-        const to     = `<span class="branch">${esc(evt.to_branch)}</span>`;
-        const time   = `<span class="time">${esc(evt.timestamp)}</span>`;
 
-        switch (evt.action) {
-            case "PUSH":
-                return `${author} pushed to ${to} on ${time}`;
-            case "PULL_REQUEST":
-                return `${author} submitted a pull request from ${from} to ${to} on ${time}`;
-            case "MERGE":
-                return `${author} merged branch ${from} to ${to} on ${time}`;
-            default:
-                return `${author} performed ${esc(evt.action)} on ${time}`;
-        }
+    function formatEvent(evt) {
+    const author = `<span class="author">${esc(evt.author)}</span>`;
+    const from   = `<span class="branch">${esc(evt.from_branch)}</span>`;
+    const to     = `<span class="branch">${esc(evt.to_branch)}</span>`;
+
+    // Format ISO timestamp to  UTC
+    const dateObj = new Date(evt.timestamp);
+    const formattedTime = dateObj.toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "UTC"
+    }) + " UTC";
+
+    const time = `<span class="time">${formattedTime}</span>`;
+
+    switch (evt.action) {
+        case "PUSH":
+            return `${author} pushed to ${to} on ${time}`;
+        case "PULL_REQUEST":
+            return `${author} submitted a pull request from ${from} to ${to} on ${time}`;
+        case "MERGE":
+            return `${author} merged branch ${from} to ${to} on ${time}`;
+        default:
+            return `${author} performed ${esc(evt.action)} on ${time}`;
     }
+}
 
     /**
      * Minimal HTML-escape to prevent XSS.
