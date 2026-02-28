@@ -1,15 +1,11 @@
-import uuid
-from datetime import datetime, timezone
-
 from flask import Blueprint, jsonify, request
 from app.extensions import mongo
 
-webhook = Blueprint('Webhook', __name__, url_prefix='/webhook')
+webhook = Blueprint("webhook", __name__, url_prefix="/webhook")
 
 
-@webhook.route('/receiver', methods=["POST"])
+@webhook.route("/receiver", methods=["POST"])
 def receiver():
-    # Get event type from GitHub header
     event_type = request.headers.get("X-GitHub-Event")
     payload = request.get_json()
 
@@ -18,47 +14,47 @@ def receiver():
 
     document = None
 
-    # Handle push event
+    # ---------------- PUSH EVENT ----------------
     if event_type == "push":
         ref = payload.get("ref", "")
-        # ref usually looks like: refs/heads/main
         to_branch = ref.replace("refs/heads/", "") if ref.startswith("refs/heads/") else ref
 
         document = {
-            "request_id": str(uuid.uuid4()),
+            "request_id": payload.get("after", ""),  # commit hash
             "author": payload.get("pusher", {}).get("name", "unknown"),
             "action": "PUSH",
             "from_branch": "",
             "to_branch": to_branch,
-            "timestamp": datetime.now(timezone.utc).strftime("%d %B %Y - %I:%M %p UTC"),
+            "timestamp": payload.get("head_commit", {}).get("timestamp", ""),
         }
 
-    # Handle pull request events (including merge)
+    # ---------------- PULL REQUEST / MERGE ----------------
     elif event_type == "pull_request":
         pr = payload.get("pull_request", {})
-        merged = pr.get("merged", False)
-        action_str = payload.get("action", "")
+        action_name = payload.get("action")
 
-        # If PR is closed and merged → treat as MERGE
-        if action_str == "closed" and merged:
+        is_merged = action_name == "closed" and pr.get("merged", False)
+
+        if is_merged:
             action = "MERGE"
+            timestamp = pr.get("merged_at", "")
         else:
             action = "PULL_REQUEST"
+            timestamp = pr.get("created_at", "")
 
         document = {
-            "request_id": str(uuid.uuid4()),
-            "author": payload.get("sender", {}).get("login", "unknown"),
+            "request_id": str(pr.get("id", "")),  # PR ID
+            "author": pr.get("user", {}).get("login", "unknown"),
             "action": action,
             "from_branch": pr.get("head", {}).get("ref", ""),
             "to_branch": pr.get("base", {}).get("ref", ""),
-            "timestamp": datetime.now(timezone.utc).strftime("%d %B %Y - %I:%M %p UTC"),
+            "timestamp": timestamp,
         }
 
     else:
-        # Ignore other GitHub events
-        return jsonify({"status": "ignored", "event": event_type}), 200
+        # Ignore unrelated GitHub events
+        return jsonify({"status": "ignored"}), 200
 
-    # Save event to MongoDB
     mongo.db.events.insert_one(document)
 
-    return jsonify({"status": "ok", "request_id": document["request_id"]}), 200
+    return jsonify({"status": "success"}), 200
